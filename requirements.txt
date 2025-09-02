@@ -4,4 +4,6 @@ scikit-learn
 mlflow
 seaborn
 matplotlib
+xgboost
+catboost
 -e .
