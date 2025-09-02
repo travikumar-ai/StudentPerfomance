@@ -9,6 +9,9 @@ from src.utills.exception import CustomException
 import mlflow
 from mlflow.models import infer_signature
 
+#--- remote ml flow-------
+import dagshub
+
 #-----models-----
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
@@ -22,13 +25,14 @@ from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 
 
-from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, root_mean_squared_error
 from sklearn.metrics import r2_score
 
 #-------save the model----
 from src.utills.utilities import save_object, evaluate_models
 
-
+dagshub.init(repo_owner='travikumar3456',
+             repo_name='StudentPerfomance', mlflow=True)
 
 
 @dataclass
@@ -53,7 +57,7 @@ class ModelTrainer:
             )
             
             models = {
-                # 'LinearRegression': LinearRegression() ,
+                'LinearRegression': LinearRegression() ,
                 'KNeighborsRegressor': KNeighborsRegressor(),
                 'DecisionTreeRegressor': DecisionTreeRegressor() ,
                 'GradientBoostingRegressor': GradientBoostingRegressor() ,
@@ -120,7 +124,8 @@ class ModelTrainer:
             best_model = models[best_model_name]
             best_model.set_params(**models_best_params[best_model_name])
             
-            mlflow.set_tracking_uri('http://localhost:5000')
+            # mlflow.set_tracking_uri('http://localhost:5000')
+            mlflow.autolog()
             
             mlflow.set_experiment('Student Performance Prediction')
             with mlflow.start_run(run_name='Student Performance Predictions'):
@@ -129,7 +134,12 @@ class ModelTrainer:
                 predicted = best_model.predict(X_test)
 
                 r2_square = r2_score(y_test, predicted)
+                mse = mean_squared_error(y_test, predicted)
+                rmse = root_mean_squared_error(y_test, predicted)
                 
+                
+                mlflow.log_metric('MSE', mse)
+                mlflow.log_metric('RMSE', rmse)
                 mlflow.log_metric('R2 Score', r2_square)
                 
                 mlflow.set_tag(
@@ -142,7 +152,7 @@ class ModelTrainer:
                 
                 mlflow.sklearn.log_model(
                     sk_model= best_model,
-                    name='Student Performance Prediction',
+                    artifact_path='model',
                     signature= signature,
                     input_example=X_train,
                     registered_model_name=f'{best_model_name}'
