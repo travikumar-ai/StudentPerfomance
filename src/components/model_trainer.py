@@ -6,6 +6,8 @@ from src.utills import logger
 import logging
 from src.utills.exception import CustomException
 
+import mlflow
+from mlflow.models import infer_signature
 
 #-----models-----
 from sklearn.linear_model import LinearRegression
@@ -28,9 +30,10 @@ from src.utills.utilities import save_object, evaluate_models
 
 
 
+
 @dataclass
 class ModelTrainingConfig:
-    trained_model_file_path = os.path.join('artifacs', 'model.pkl')
+    trained_model_file_path = r'src/artifacts'
     
 
 class ModelTrainer:
@@ -50,7 +53,7 @@ class ModelTrainer:
             )
             
             models = {
-                'LinearRegression': LinearRegression() ,
+                # 'LinearRegression': LinearRegression() ,
                 'KNeighborsRegressor': KNeighborsRegressor(),
                 'DecisionTreeRegressor': DecisionTreeRegressor() ,
                 'GradientBoostingRegressor': GradientBoostingRegressor() ,
@@ -93,13 +96,13 @@ class ModelTrainer:
                         'XGBRegressor':  {
                                                 'learning_rate': [.1, .01, .05, .001],
                                                 'n_estimators': [8, 16, 32, 64, 128, 256]
-                                            }, ,
+                                            }, 
                         'CatBoostRegressor':  {
                                                     'depth': [6, 8, 10],
                                                     'iterations': [30, 50, 100]
-                                                }, ,
+                                                },
                 }
-            model_train_report, model_test_report = evaluate_models(X_train, 
+            model_train_report, model_test_report, models_best_params = evaluate_models(X_train, 
                                                 y_train,
                                                 X_test,
                                                 y_test,
@@ -115,21 +118,54 @@ class ModelTrainer:
                 list(model_test_report.values()).index(best_model_score)
             ]
             best_model = models[best_model_name]
+            best_model.set_params(**models_best_params[best_model_name])
             
+            mlflow.set_tracking_uri('http://localhost:5000')
+            
+            mlflow.set_experiment('Student Performance Prediction')
+            with mlflow.start_run(run_name='Student Performance Predictions'):
+                mlflow.log_params(models_best_params[best_model_name])
+                
+                predicted = best_model.predict(X_test)
+
+                r2_square = r2_score(y_test, predicted)
+                
+                mlflow.log_metric('R2 Score', r2_square)
+                
+                mlflow.set_tag(
+                    'Student Performance Prediction', 'v1.0'
+                )
+                
+                signature = infer_signature(X_train, best_model.predict(X_train))
+                
+                
+                
+                mlflow.sklearn.log_model(
+                    sk_model= best_model,
+                    name='Student Performance Prediction',
+                    signature= signature,
+                    input_example=X_train,
+                    registered_model_name=f'{best_model_name}'
+                )
+                
+                
             if best_model_score < 0.6:
                 raise CustomException("No best model found")
             logging.info(
                 f"Best found model on both training and testing dataset")
 
             save_object(
-                file_path=self.model_trainer_config.trained_model_file_path,
+                file_path=os.path.join(self.model_trainer_config.trained_model_file_path ,
+                                       best_model_name + '.pkl'),
                 obj=best_model
             )
             
-            predicted = best_model.predict(X_test)
-
-            r2_square = r2_score(y_test, predicted)
-            return r2_square
+            
+            
+            
+            
+            
+            return r2_square, best_model_name, models_best_params[best_model_name]
         except Exception as e:
             raise CustomException(e)
             

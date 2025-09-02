@@ -18,9 +18,9 @@ RAW_DATA_CSV_FILE = 'data/data.csv'
 
 @dataclass
 class DataIngestionConfig:
-    raw_data = os.path.join('artifacts', 'raw.csv')
-    train_data = os.path.join('artifacts', 'train.csv')
-    test_data = os.path.join('artifacts', 'test.csv')
+    raw_data = os.path.join('src/artifacts', 'raw.csv')
+    train_data = os.path.join('src/artifacts', 'train.csv')
+    test_data = os.path.join('src/artifacts', 'test.csv')
     
 
 class DataIngestion:
